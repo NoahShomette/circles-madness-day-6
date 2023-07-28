@@ -25,3 +25,6 @@ bevy_asset_loader = "0.17.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy = { version = "0.11" }
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-server-runner"

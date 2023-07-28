@@ -23,7 +23,7 @@ impl Plugin for BulletPlugin {
 
 #[derive(AssetCollection, Resource)]
 struct BulletAssets {
-    #[asset(path = "sounds/pew1.ogg")]
+    #[asset(path = "sounds/zap.ogg")]
     pew1: Handle<AudioSource>,
 }
 
