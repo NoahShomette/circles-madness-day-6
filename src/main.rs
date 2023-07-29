@@ -302,7 +302,7 @@ pub fn try_apply_damages(
                     commands.entity(e).despawn();
                     deleted_entities.push(ev.0);
                     let chance = rand::thread_rng().gen_range(1..=100);
-                    if chance > 80 {
+                    if chance > 60 {
                         commands.spawn((
                             Pickup(PickupKind::Health(0.1f32)),
                             Transform::from_translation(transform.translation),
