@@ -114,9 +114,8 @@ fn display_controls_hint(
     if game_state.get() == &GameState::Menu {
         controls_hint.display = Display::DEFAULT;
     } else {
-        last_activity.0.tick(time.elapsed());
-        // dbg!(last_activity.0.elapsed_secs()); //Doesn't seem to be seconds? wtf
-        if last_activity.0.elapsed_secs() > 900. {
+        last_activity.0.tick(time.delta());
+        if last_activity.0.elapsed_secs() > 1_f32 {
             controls_hint.display = Display::DEFAULT;
         } else {
             controls_hint.display = Display::None;

@@ -2,6 +2,7 @@ use bevy::{math::Vec3Swizzles, prelude::*, window::PrimaryWindow};
 
 use crate::{
     bullets::CommandsSpawnBullet, menu::LastActivity, movement::MoveTarget, Cooldown, TeamIdx,
+    Weapon,
 };
 
 #[derive(Component, Debug)]
@@ -36,7 +37,17 @@ pub fn handle_clicks_to_fire(
     time: Res<Time>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     buttons: Res<Input<MouseButton>>,
-    mut q_attackers: Query<(Entity, &Transform, &MoveTarget, &TeamIdx, &Cooldown), With<Player>>,
+    mut q_attackers: Query<
+        (
+            Entity,
+            &Transform,
+            &MoveTarget,
+            &TeamIdx,
+            &Cooldown,
+            &Weapon,
+        ),
+        With<Player>,
+    >,
     camera: Query<(&GlobalTransform, &Camera)>,
     mut last_activity: ResMut<LastActivity>,
 ) {
@@ -46,7 +57,7 @@ pub fn handle_clicks_to_fire(
                 let Some(position) = camera.viewport_to_world_2d(camera_transform, position) else {
                     return;
                 };
-                for (entity, transform, _, team, cooldown) in q_attackers.iter_mut() {
+                for (entity, transform, _, team, cooldown, weapon) in q_attackers.iter_mut() {
                     let t_position = transform.translation.xy();
                     // TODO: rework bullet spawn to take place with an event
                     if commands
@@ -57,6 +68,8 @@ pub fn handle_clicks_to_fire(
                             team.clone(),
                             cooldown,
                             &time,
+                            weapon.bullets,
+                            weapon.spread,
                         )
                         .is_ok()
                     {

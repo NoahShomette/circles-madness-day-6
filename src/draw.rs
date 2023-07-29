@@ -5,7 +5,7 @@ use bevy_vector_shapes::prelude::*;
 
 use crate::{
     movement::{MoveDirection, MoveTarget},
-    Cooldown, Health, HealthPickup, TeamIdx, Teams,
+    Cooldown, Health, Pickup, PickupKind, TeamIdx, Teams,
 };
 
 pub fn draw(
@@ -68,16 +68,23 @@ pub fn draw_cooldown(
     }
 }
 
-pub fn draw_pickups(
-    time: Res<Time>,
-    mut gizmos: Gizmos,
-    q_movers: Query<&Transform, With<HealthPickup>>,
-) {
-    for transform in q_movers.iter() {
-        gizmos.circle_2d(
-            transform.translation.xy(),
-            2f32 + (time.elapsed_seconds() * 3f32).sin(),
-            Color::BLUE * 3f32,
-        );
+pub fn draw_pickups(time: Res<Time>, mut gizmos: Gizmos, q_movers: Query<(&Transform, &Pickup)>) {
+    for (transform, pickup) in q_movers.iter() {
+        match pickup.0 {
+            PickupKind::Health(_) => {
+                gizmos.circle_2d(
+                    transform.translation.xy(),
+                    2f32 + (time.elapsed_seconds() * 3f32).sin(),
+                    Color::BLUE * 3f32,
+                );
+            }
+            PickupKind::Weapon(_) => {
+                gizmos.circle_2d(
+                    transform.translation.xy(),
+                    2f32 + (time.elapsed_seconds() * 3f32).sin(),
+                    Color::RED * 3f32,
+                );
+            }
+        }
     }
 }

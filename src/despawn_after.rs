@@ -24,7 +24,7 @@ fn despawn_after(
     mut q_des: Query<(Entity, &mut DespawnAfter)>,
 ) {
     for (e, mut d) in q_des.iter_mut() {
-        d.timer.tick(time.elapsed());
+        d.timer.tick(time.delta());
         if d.timer.finished() {
             commands.entity(e).despawn();
         }

@@ -16,6 +16,7 @@ use bevy::{
     render::camera::ScalingMode,
 };
 use bevy_vector_shapes::prelude::*;
+use rand::prelude::*;
 
 use ai::*;
 use bullets::*;
@@ -46,6 +47,14 @@ pub struct Health {
     pub current: f32,
     pub max: f32,
 }
+
+#[derive(Component, Debug)]
+pub struct Weapon {
+    pub bullets: u16,
+    pub max: u16,
+    pub spread: f32,
+}
+
 #[derive(Component, Debug)]
 pub struct Cooldown {
     pub start_time: f32,
@@ -59,7 +68,7 @@ impl Cooldown {
 
 pub struct Game;
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Copy)]
 pub struct TeamIdx(pub usize);
 
 #[derive(Resource)]
@@ -78,8 +87,14 @@ impl Default for Teams {
     }
 }
 
+#[derive(Clone)]
+enum PickupKind {
+    Health(f32),
+    Weapon(u16),
+}
+
 #[derive(Component, Clone)]
-pub struct HealthPickup(pub f32);
+pub struct Pickup(PickupKind);
 
 #[derive(Event)]
 pub struct EventTryApplyDamages(pub Entity, pub f32);
@@ -87,6 +102,7 @@ pub struct EventTryApplyDamages(pub Entity, pub f32);
 #[derive(Resource)]
 pub struct GameDef {
     pub spawn_interval: f32,
+    pub initial_spawn_interval: f32,
     pub spawn_interval_multiplier_per_second: f32,
 }
 
@@ -94,6 +110,7 @@ impl Default for GameDef {
     fn default() -> Self {
         Self {
             spawn_interval: 5f32,
+            initial_spawn_interval: 5f32, // Messy messy
             spawn_interval_multiplier_per_second: 0.9f32,
         }
     }
@@ -123,6 +140,7 @@ impl Plugin for Game {
                     spawn_ais,
                     ai::ai_fire,
                     ai::ai_move,
+                    update_spawn_interval,
                 ),
                 (try_apply_damages,),
                 (
@@ -170,6 +188,11 @@ fn player_respawn(
         Health {
             current: 1f32,
             max: 1f32,
+        },
+        Weapon {
+            bullets: 1u16,
+            max: 20u16,
+            spread: 15_f32,
         },
         Cooldown {
             start_time: 0.0,
@@ -236,16 +259,26 @@ pub fn collisions_bullet_health(
 }
 pub fn collisions_player_pickups(
     mut commands: Commands,
-    q_pickups: Query<(Entity, &Transform, &HealthPickup)>,
-    mut q_health: Query<(Entity, &Transform, &mut Health), Without<HealthPickup>>,
+    q_pickups: Query<(Entity, &Transform, &Pickup)>,
+    mut q_stats: Query<(Entity, &Transform, &mut Health, &mut Weapon), Without<Pickup>>,
 ) {
-    for (e, t, mut health) in q_health.iter_mut() {
+    for (e, t, mut health, mut weapon) in q_stats.iter_mut() {
         for (e_pickup, bullet_position, pickup) in q_pickups.iter() {
             if bullet_position.translation.distance(t.translation) < 20f32 {
-                health.current += pickup.0;
-                health.current = health.current.min(health.max);
-                commands.entity(e_pickup).despawn();
-                continue;
+                match pickup.0 {
+                    PickupKind::Health(health_value) => {
+                        health.current += health_value;
+                        health.current = health.current.min(health.max);
+                        commands.entity(e_pickup).despawn();
+                        continue;
+                    }
+                    PickupKind::Weapon(bullet_increase) => {
+                        weapon.bullets += bullet_increase;
+                        weapon.bullets = weapon.bullets.min(weapon.max);
+                        commands.entity(e_pickup).despawn();
+                        continue;
+                    }
+                }
             }
         }
     }
@@ -256,17 +289,35 @@ pub fn try_apply_damages(
     mut events_try_damage: EventReader<EventTryApplyDamages>,
     mut q_health: Query<(Entity, &Transform, &mut Health)>,
 ) {
+    let mut deleted_entities = Vec::new();
     for ev in events_try_damage.iter() {
-        let (e, transform, mut health) = q_health.get_mut(ev.0).unwrap();
-        health.current -= 0.25f32;
-        // TODO: fire event touched to spawn particles!
-        if dbg!(health.current) <= 0f32 {
-            commands.entity(e).despawn();
-            commands.spawn((
-                HealthPickup(0.1f32),
-                Transform::from_translation(transform.translation),
-                RemoveOnRespawn,
-            ));
+        if deleted_entities.contains(&ev.0) {
+            continue;
+        }
+        match q_health.get_mut(ev.0) {
+            Ok((e, transform, mut health)) => {
+                health.current -= 0.25f32;
+                // TODO: fire event touched to spawn particles!
+                if dbg!(health.current) <= 0f32 {
+                    commands.entity(e).despawn();
+                    deleted_entities.push(ev.0);
+                    let chance = rand::thread_rng().gen_range(1..=100);
+                    if chance > 80 {
+                        commands.spawn((
+                            Pickup(PickupKind::Health(0.1f32)),
+                            Transform::from_translation(transform.translation),
+                            RemoveOnRespawn,
+                        ));
+                    } else {
+                        commands.spawn((
+                            Pickup(PickupKind::Weapon(1)),
+                            Transform::from_translation(transform.translation),
+                            RemoveOnRespawn,
+                        ));
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

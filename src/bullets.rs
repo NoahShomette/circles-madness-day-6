@@ -37,6 +37,8 @@ pub struct SpawnBulletCommand {
     team: TeamIdx,
     from_position: Vec2,
     to_direction: Vec2,
+    number_of_bullets: u16,
+    bullet_spread: f32,
 }
 
 #[derive(Component)]
@@ -46,22 +48,26 @@ pub struct BulletOwner {
 
 impl Command for SpawnBulletCommand {
     fn apply(self, world: &mut World) {
-        world.spawn((
-            Transform {
-                translation: self.from_position.extend(2f32),
-                ..default()
-            },
-            MoveSpeed(400f32),
-            MoveDirection(self.to_direction),
-            DespawnAfter {
-                timer: Timer::from_seconds(2000., TimerMode::Once), //Not real seconds either??
-            },
-            BulletOwner {
-                entity: self.from_entity,
-            },
-            self.team,
-            RemoveOnRespawn,
-        ));
+        for n in 0..self.number_of_bullets as i16 {
+            let rotation =
+                Vec2::from_angle(std::f32::consts::TAU / self.number_of_bullets as f32 * n as f32);
+            world.spawn((
+                Transform {
+                    translation: self.from_position.extend(2f32),
+                    ..default()
+                },
+                MoveSpeed(400f32),
+                MoveDirection(rotation.rotate(self.to_direction)),
+                DespawnAfter {
+                    timer: Timer::from_seconds(2_f32, TimerMode::Once),
+                },
+                BulletOwner {
+                    entity: self.from_entity,
+                },
+                self.team,
+                RemoveOnRespawn,
+            ));
+        }
         world.send_event(EventBulletSpawn {
             origin: self.from_position,
         });
@@ -77,6 +83,8 @@ pub trait CommandsSpawnBullet {
         team: TeamIdx,
         cooldown: &Cooldown,
         time: &Res<Time>,
+        number_of_bullets: u16,
+        bullet_spread: f32,
     ) -> Result<&mut Self, ()>;
 }
 
@@ -89,6 +97,8 @@ impl CommandsSpawnBullet for Commands<'_, '_> {
         team: TeamIdx,
         cooldown: &Cooldown,
         time: &Res<Time>,
+        number_of_bullets: u16,
+        bullet_spread: f32,
     ) -> Result<&mut Self, ()> {
         if direction == Vec2::ZERO {
             return Err(());
@@ -102,6 +112,8 @@ impl CommandsSpawnBullet for Commands<'_, '_> {
             from_position,
             to_direction: direction,
             team,
+            number_of_bullets,
+            bullet_spread,
         });
         Ok(self)
     }
@@ -128,7 +140,7 @@ fn bullet_sounds(
                 ),
             },
             DespawnAfter {
-                timer: Timer::from_seconds(2000., TimerMode::Once),
+                timer: Timer::from_seconds(1_f32, TimerMode::Once),
             },
         ));
     }
