@@ -1,5 +1,7 @@
 # Circles Madness
 
+I only had around 2 hours to do this so not a lot of changes but at least its still alive!
+
 Made for the Pass the game challenge 2023: https://itch.io/jam/day-5
 
 - Day 1: https://itch.io/jam/day-1/rate/2187006
