@@ -15,6 +15,7 @@ use bevy::{
     prelude::*,
     render::camera::ScalingMode,
 };
+use bevy_asset_loader::prelude::AssetCollectionApp;
 use bevy_vector_shapes::prelude::*;
 use rand::prelude::*;
 
@@ -119,12 +120,13 @@ impl Default for GameDef {
 impl Plugin for Game {
     fn build(&self, app: &mut App) {
         app.add_plugins(Shape2dPlugin::default());
-        app.add_plugins(BulletPlugin);
-        app.add_plugins(MenuPlugin);
-        app.init_resource::<GameDef>();
-        app.init_resource::<Teams>();
-        app.add_event::<EventBulletSpawn>();
-        app.add_event::<EventTryApplyDamages>();
+        app.add_plugins(BulletPlugin)
+            .add_plugins(MenuPlugin)
+            .add_plugins(PlayerPlugin)
+            .add_plugins(AiPlugin);
+        app.init_resource::<GameDef>().init_resource::<Teams>();
+        app.add_event::<EventBulletSpawn>()
+            .add_event::<EventTryApplyDamages>();
         app.add_systems(Startup, setup);
         app.add_systems(
             Update,
@@ -138,8 +140,8 @@ impl Plugin for Game {
                     move_targets,
                     move_direction,
                     spawn_ais,
-                    ai::ai_fire,
-                    ai::ai_move,
+                    ai_fire,
+                    ai_move,
                     update_spawn_interval,
                 ),
                 (try_apply_damages,),
@@ -186,12 +188,12 @@ fn player_respawn(
             target: Some(Vec2::new(0f32, 0f32)),
         },
         Health {
-            current: 1f32,
-            max: 1f32,
+            current: 1.5f32,
+            max: 1.5f32,
         },
         Weapon {
             bullets: 1u16,
-            max: 20u16,
+            max: 36u16,
             spread: 15_f32,
         },
         Cooldown {
@@ -260,22 +262,40 @@ pub fn collisions_bullet_health(
 pub fn collisions_player_pickups(
     mut commands: Commands,
     q_pickups: Query<(Entity, &Transform, &Pickup)>,
-    mut q_stats: Query<(Entity, &Transform, &mut Health, &mut Weapon), Without<Pickup>>,
+    mut q_stats: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Health,
+            &mut Weapon,
+            Option<&Player>,
+        ),
+        Without<Pickup>,
+    >,
+    mut health_events: EventWriter<PlayerPickupHealthEvent>,
+    mut weapon_events: EventWriter<PlayerPickupWeaponEvent>,
 ) {
-    for (e, t, mut health, mut weapon) in q_stats.iter_mut() {
+    for (e, t, mut health, mut weapon, option_player) in q_stats.iter_mut() {
         for (e_pickup, bullet_position, pickup) in q_pickups.iter() {
             if bullet_position.translation.distance(t.translation) < 20f32 {
+                let is_player_picking_up = option_player.is_some();
                 match pickup.0 {
                     PickupKind::Health(health_value) => {
                         health.current += health_value;
                         health.current = health.current.min(health.max);
                         commands.entity(e_pickup).despawn();
+                        if is_player_picking_up {
+                            health_events.send_default();
+                        }
                         continue;
                     }
                     PickupKind::Weapon(bullet_increase) => {
                         weapon.bullets += bullet_increase;
                         weapon.bullets = weapon.bullets.min(weapon.max);
                         commands.entity(e_pickup).despawn();
+                        if is_player_picking_up {
+                            weapon_events.send_default();
+                        }
                         continue;
                     }
                 }
@@ -287,7 +307,15 @@ pub fn collisions_player_pickups(
 pub fn try_apply_damages(
     mut commands: Commands,
     mut events_try_damage: EventReader<EventTryApplyDamages>,
-    mut q_health: Query<(Entity, &Transform, &mut Health)>,
+    mut q_health: Query<(
+        Entity,
+        &Transform,
+        &mut Health,
+        Option<&BigAi>,
+        Option<&Player>,
+    )>,
+    mut player_damage_events: EventWriter<PlayerDamagedEvent>,
+    mut ai_killed: EventWriter<AiDeathEvent>,
 ) {
     let mut deleted_entities = Vec::new();
     for ev in events_try_damage.iter() {
@@ -295,25 +323,48 @@ pub fn try_apply_damages(
             continue;
         }
         match q_health.get_mut(ev.0) {
-            Ok((e, transform, mut health)) => {
+            Ok((e, transform, mut health, option_big_ai, option_player)) => {
+                if let Some(_) = option_player {
+                    player_damage_events.send_default();
+                }
                 health.current -= 0.25f32;
                 // TODO: fire event touched to spawn particles!
                 if dbg!(health.current) <= 0f32 {
+                    if let Some(_) = option_player {
+                    } else {
+                        ai_killed.send_default();
+                    }
                     commands.entity(e).despawn();
                     deleted_entities.push(ev.0);
-                    let chance = rand::thread_rng().gen_range(1..=100);
+                    let chance = thread_rng().gen_range(1..=100);
+                    let amount_amount_to_spawn = match option_big_ai {
+                        None => 1,
+                        Some(_) => 3,
+                    };
                     if chance > 60 {
-                        commands.spawn((
-                            Pickup(PickupKind::Health(0.1f32)),
-                            Transform::from_translation(transform.translation),
-                            RemoveOnRespawn,
-                        ));
+                        for i in 0..amount_amount_to_spawn {
+                            commands.spawn((
+                                Pickup(PickupKind::Health(0.25f32)),
+                                Transform::from_translation(Vec3::new(
+                                    transform.translation.x + (i * 2) as f32,
+                                    transform.translation.y + (i * 2) as f32,
+                                    transform.translation.z,
+                                )),
+                                RemoveOnRespawn,
+                            ));
+                        }
                     } else {
-                        commands.spawn((
-                            Pickup(PickupKind::Weapon(1)),
-                            Transform::from_translation(transform.translation),
-                            RemoveOnRespawn,
-                        ));
+                        for i in 0..amount_amount_to_spawn {
+                            commands.spawn((
+                                Pickup(PickupKind::Weapon(1)),
+                                Transform::from_translation(Vec3::new(
+                                    transform.translation.x + (i * 2) as f32,
+                                    transform.translation.y + (i * 2) as f32,
+                                    transform.translation.z,
+                                )),
+                                RemoveOnRespawn,
+                            ));
+                        }
                     }
                 }
             }

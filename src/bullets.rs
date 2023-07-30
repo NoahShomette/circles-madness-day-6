@@ -120,7 +120,6 @@ impl CommandsSpawnBullet for Commands<'_, '_> {
 }
 
 fn bullet_sounds(
-    time: Res<Time>,
     bullet_assets: Res<BulletAssets>,
     mut commands: Commands,
     mut ev_bullets: EventReader<EventBulletSpawn>,

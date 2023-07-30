@@ -3,6 +3,7 @@ use std::f32::consts::TAU;
 use bevy::{math::Vec3Swizzles, prelude::*};
 use bevy_vector_shapes::prelude::*;
 
+use crate::ai::BigAi;
 use crate::{
     movement::{MoveDirection, MoveTarget},
     Cooldown, Health, Pickup, PickupKind, TeamIdx, Teams,
@@ -11,10 +12,14 @@ use crate::{
 pub fn draw(
     teams: Res<Teams>,
     mut gizmos: Gizmos,
-    q_movers: Query<(&Transform, &TeamIdx), With<MoveTarget>>,
+    q_movers: Query<(&Transform, &TeamIdx, Option<&BigAi>), With<MoveTarget>>,
 ) {
-    for (transform, team) in q_movers.iter() {
-        gizmos.circle_2d(transform.translation.xy(), 5f32, teams.colors[team.0].0);
+    for (transform, team, big_ai_option) in q_movers.iter() {
+        if let Some(_) = big_ai_option {
+            gizmos.circle_2d(transform.translation.xy(), 15f32, teams.colors[team.0].0);
+        } else {
+            gizmos.circle_2d(transform.translation.xy(), 5f32, teams.colors[team.0].0);
+        }
     }
 }
 
@@ -28,8 +33,11 @@ pub fn draw_bullets(
     }
 }
 
-pub fn draw_health(mut painter: ShapePainter, q_movers: Query<(&Transform, &Health, &TeamIdx)>) {
-    for (transform, health, team) in q_movers.iter() {
+pub fn draw_health(
+    mut painter: ShapePainter,
+    q_movers: Query<(&Transform, &Health, &TeamIdx, Option<&BigAi>)>,
+) {
+    for (transform, health, team, big_ai_option) in q_movers.iter() {
         if health.max <= health.current {
             continue;
         }
@@ -42,15 +50,20 @@ pub fn draw_health(mut painter: ShapePainter, q_movers: Query<(&Transform, &Heal
         painter.hollow = true;
         painter.color = Color::CRIMSON * 3f32;
         painter.cap = Cap::None;
-        painter.arc(10f32, start_angle, end_angle);
+        let mut radius = 10f32;
+
+        if let Some(_) = big_ai_option {
+            radius = 20f32;
+        }
+        painter.arc(radius, start_angle, end_angle);
     }
 }
 pub fn draw_cooldown(
     time: Res<Time>,
     mut painter: ShapePainter,
-    q_movers: Query<(&Transform, &Cooldown, &TeamIdx)>,
+    q_movers: Query<(&Transform, &Cooldown, &TeamIdx, Option<&BigAi>)>,
 ) {
-    for (transform, cooldown, team) in q_movers.iter() {
+    for (transform, cooldown, team, big_ai_option) in q_movers.iter() {
         if cooldown.start_time + cooldown.duration < time.elapsed_seconds() {
             continue;
         }
@@ -59,12 +72,15 @@ pub fn draw_cooldown(
 
         let start_angle = 0f32 * 3.0;
         let end_angle = start_angle + (ratio * TAU);
-
+        let mut radius = 13f32;
+        if let Some(_) = big_ai_option {
+            radius = 25f32;
+        }
         painter.thickness = 1f32;
         painter.hollow = true;
         painter.color = Color::WHITE;
         painter.cap = Cap::None;
-        painter.arc(13f32, start_angle, end_angle);
+        painter.arc(radius, start_angle, end_angle);
     }
 }
 
