@@ -332,7 +332,9 @@ pub fn try_apply_damages(
                 if dbg!(health.current) <= 0f32 {
                     if let Some(_) = option_player {
                     } else {
-                        ai_killed.send_default();
+                        ai_killed.send(AiDeathEvent {
+                            origin: transform.translation.truncate(),
+                        });
                     }
                     commands.entity(e).despawn();
                     deleted_entities.push(ev.0);

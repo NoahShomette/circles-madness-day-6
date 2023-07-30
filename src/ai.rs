@@ -29,12 +29,14 @@ impl Plugin for AiPlugin {
 
 #[derive(AssetCollection, Resource)]
 pub struct AiSoundAssets {
-    #[asset(path = "sounds/explosion-1.ogg")]
+    #[asset(path = "sounds/explosion-2.ogg")]
     ai_killed: Handle<AudioSource>,
 }
 
 #[derive(Event, Debug, Default)]
-pub struct AiDeathEvent;
+pub struct AiDeathEvent {
+    pub origin: Vec2,
+}
 
 #[derive(Component, Debug)]
 pub struct Ai;
@@ -244,11 +246,12 @@ pub fn handle_ai_sounds(
         commands.spawn((
             SpatialAudioBundle {
                 source: bullet_assets.ai_killed.clone(),
-                settings: PlaybackSettings::ONCE.with_volume(Volume::new_relative(5.0)),
+                settings: PlaybackSettings::ONCE.with_volume(Volume::new_relative(2.0)),
                 spatial: SpatialSettings::new(
                     Transform::IDENTITY,
                     5f32,
-                    ((listener.translation.xy()).normalize_or_zero() * (5f32 / 2f32)).extend(0f32),
+                    ((e.origin - listener.translation.xy()).normalize_or_zero() * (5f32 / 2f32))
+                        .extend(0f32),
                 ),
             },
             DespawnAfter {
