@@ -9,7 +9,7 @@ env:
   # update with the name of the main binary
   binary: circles_madness
   add_binaries_to_github_release: true
-  itch_target: selene-amanita/circles-madness
+  itch_target: NoahShomette/circles-madness-day-6-bevy
 
 jobs:
   # Build for wasm
